@@ -1,0 +1,140 @@
+import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.impl.HttpSolrClient;
+import org.apache.solr.client.solrj.response.UpdateResponse;
+import org.apache.solr.client.solrj.response.QueryResponse;
+import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.params.ModifiableSolrParams;
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
+import java.io.File;
+import java.io.IOException;
+import java.util.Scanner;
+
+public class SolrOperations {
+
+    private static final String SOLR_URL = "http://localhost:8983/solr/";
+    private SolrClient solrClient;
+
+    public SolrOperations(String collectionName) {
+        this.solrClient = new HttpSolrClient.Builder(SOLR_URL + collectionName).build();
+    }
+
+   
+    public static void createCollection(String collectionName) throws IOException {
+        ProcessBuilder processBuilder = new ProcessBuilder("bin/solr", "create", "-c", collectionName);
+        processBuilder.directory(new File("/path/to/solr")); // Replace with your Solr installation path
+        processBuilder.inheritIO();
+        processBuilder.start();
+        System.out.println("Collection " + collectionName + " created.");
+    }
+
+    
+    public void indexData(String filePath, String excludeColumn) throws IOException {
+        try (Scanner scanner = new Scanner(new File(filePath))) {
+            String[] headers = scanner.nextLine().split(",");
+            while (scanner.hasNextLine()) {
+                String[] values = scanner.nextLine().split(",");
+                SolrInputDocument doc = new SolrInputDocument();
+                for (int i = 0; i < headers.length; i++) {
+                    if (!headers[i].equalsIgnoreCase(excludeColumn)) {
+                        doc.addField(headers[i], values[i]);
+                    }
+                }
+                solrClient.add(doc);
+            }
+            solrClient.commit();
+            System.out.println("Data indexed excluding column: " + excludeColumn);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    
+    public void searchByColumn(String columnName, String columnValue) throws IOException {
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", columnName + ":" + columnValue);
+        try {
+            QueryResponse response = solrClient.query(params);
+            SolrDocumentList documents = response.getResults();
+            for (SolrDocument doc : documents) {
+                System.out.println(doc);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    
+    public void getEmpCount() throws IOException {
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "*:*");
+        try {
+            QueryResponse response = solrClient.query(params);
+            System.out.println("Total employee count: " + response.getResults().getNumFound());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    
+    public void delEmpById(String employeeId) throws IOException {
+        try {
+            UpdateResponse response = solrClient.deleteById(employeeId);
+            solrClient.commit();
+            System.out.println("Employee with ID " + employeeId + " deleted.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    
+    public void getDepFacet() throws IOException {
+        ModifiableSolrParams params = new ModifiableSolrParams();
+        params.set("q", "*:*");
+        params.set("facet", "true");
+        params.set("facet.field", "Department");
+        params.set("facet.limit", "-1");
+        try {
+            QueryResponse response = solrClient.query(params);
+            System.out.println("Department-wise employee count: " + response.getFacetField("Department").getValues());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    
+    public void close() throws IOException {
+        solrClient.close();
+    }
+
+    public static void main(String[] args) throws IOException {
+        String v_nameCollection = "Hash_Ashika";
+        String v_phoneCollection = "Hash_1021";
+        
+        
+        createCollection(v_nameCollection);
+        createCollection(v_phoneCollection);
+
+       
+        SolrOperations nameSolr = new SolrOperations(v_nameCollection);
+        SolrOperations phoneSolr = new SolrOperations(v_phoneCollection);
+
+        
+        nameSolr.getEmpCount();
+        nameSolr.indexData("path_to_employee_data.csv", "Department");
+        phoneSolr.indexData("path_to_employee_data.csv", "Gender");
+
+        nameSolr.delEmpById("E02003");
+        nameSolr.getEmpCount();
+        nameSolr.searchByColumn("Department", "CSE");
+        nameSolr.searchByColumn("Gender", "Female");
+        phoneSolr.searchByColumn("Department", "CSE");
+        
+        nameSolr.getDepFacet();
+        phoneSolr.getDepFacet();
+        
+        
+        nameSolr.close();
+        phoneSolr.close();
+    }
+}
