@@ -1,0 +1,32 @@
+ublic class StringUtil{
+public static char findFirstNonRepeat(String str) {
+int[] chars= new int[256]
+for (char c : str.toCharArray()) {
+chars[c]++;
+}
+for (char c : str.toCharArray()) {
+if (chars[c] == 1) {
+return c;
+}
+} return 0;
+}
+public static void main(String[] args) {
+String a = "swiss";
+System.out.println("Input String: " + a);
+char result = findFirstNonRepeat(a);
+if (result != 0) {
+System.out.println("First non-repeating character: " + result);
+} else {
+System.out.println("No non-repeating character found.");
+}
+}
+}
+Output 1:
+Input:racecars
+Output:e
+Output 2:
+Input:aabb
+Output:0
+Output 3:
+Input:aacbb
+Output:c
